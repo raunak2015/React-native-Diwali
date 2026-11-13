@@ -15,6 +15,9 @@ connectDB();
 
 const app = express();
 
+// Mount Routes
+const authRoutes = require('./routes/authRoutes');
+
 // Middlewares
 app.use(cors());
 app.use(express.json());
@@ -28,6 +31,8 @@ app.get('/api', (req, res) => {
     timestamp: new Date()
   });
 });
+
+app.use('/api/auth', authRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
