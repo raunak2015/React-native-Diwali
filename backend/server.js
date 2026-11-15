@@ -17,6 +17,7 @@ const app = express();
 
 // Mount Routes
 const authRoutes = require('./routes/authRoutes');
+const propertyRoutes = require('./routes/propertyRoutes');
 
 // Middlewares
 app.use(cors());
@@ -33,6 +34,7 @@ app.get('/api', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/properties', propertyRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
