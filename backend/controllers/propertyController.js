@@ -230,8 +230,32 @@ const deleteProperty = async (req, res, next) => {
   }
 };
 
+// @desc    Get featured properties
+// @route   GET /api/properties/featured
+// @access  Public
+const getFeaturedProperties = async (req, res, next) => {
+  try {
+    let properties = [];
+    try {
+      properties = await Property.find({ featured: true, isAvailable: true }).limit(5);
+    } catch (e) {}
+
+    if (!properties || properties.length === 0) {
+      properties = sampleProperties.filter((p) => p.featured);
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { properties },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProperties,
+  getFeaturedProperties,
   getPropertyById,
   createProperty,
   updateProperty,

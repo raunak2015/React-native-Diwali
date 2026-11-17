@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   getProperties,
+  getFeaturedProperties,
   getPropertyById,
   createProperty,
   updateProperty,
@@ -9,6 +10,8 @@ const {
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
+
+router.get('/featured', getFeaturedProperties);
 
 router
   .route('/')
