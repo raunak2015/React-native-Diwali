@@ -19,6 +19,7 @@ const app = express();
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const favoriteRoutes = require('./routes/favoriteRoutes');
+const visitRoutes = require('./routes/visitRoutes');
 
 // Middlewares
 app.use(cors());
@@ -37,6 +38,7 @@ app.get('/api', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/favorites', favoriteRoutes);
+app.use('/api/visits', visitRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
