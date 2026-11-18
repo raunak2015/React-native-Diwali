@@ -18,6 +18,7 @@ const app = express();
 // Mount Routes
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
+const favoriteRoutes = require('./routes/favoriteRoutes');
 
 // Middlewares
 app.use(cors());
@@ -35,6 +36,7 @@ app.get('/api', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
+app.use('/api/favorites', favoriteRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
