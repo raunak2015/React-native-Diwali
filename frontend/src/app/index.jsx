@@ -14,7 +14,11 @@ export default function SplashScreen() {
 
   useEffect(() => {
     if (!isLoading) {
-      determineNavigation();
+      // Allow user to see the RentEase splash screen for 2 seconds
+      const timer = setTimeout(() => {
+        determineNavigation();
+      }, 2000);
+      return () => clearTimeout(timer);
     }
   }, [isLoading, isAuthenticated]);
 
