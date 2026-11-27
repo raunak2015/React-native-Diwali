@@ -1,27 +1,29 @@
 const express = require('express');
+const router = express.Router();
 const {
   getProperties,
-  getFeaturedProperties,
   getPropertyById,
+  getOwnerProperties,
   createProperty,
   updateProperty,
   deleteProperty,
 } = require('../controllers/propertyController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-const router = express.Router();
+// Public route: Get all properties
+router.get('/', getProperties);
 
-router.get('/featured', getFeaturedProperties);
+// Owner protected route: Get owner's own listings
+router.get('/my-properties', protect, authorize('owner'), getOwnerProperties);
 
-router
-  .route('/')
-  .get(getProperties)
-  .post(protect, authorize('landlord', 'admin'), createProperty);
+// Public route: Get single property details
+router.get('/:id', getPropertyById);
 
-router
-  .route('/:id')
-  .get(getPropertyById)
-  .put(protect, authorize('landlord', 'admin'), updateProperty)
-  .delete(protect, authorize('landlord', 'admin'), deleteProperty);
+// Owner protected route: Create new property
+router.post('/', protect, authorize('owner'), createProperty);
+
+// Owner protected route: Update & Delete property (ownership validated in controller)
+router.put('/:id', protect, authorize('owner'), updateProperty);
+router.delete('/:id', protect, authorize('owner'), deleteProperty);
 
 module.exports = router;

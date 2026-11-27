@@ -1,80 +1,85 @@
-# RentEase — Full-Stack Real Estate Rental Platform
+# RentEase — Mobile Rental Marketplace Application
 
-A modern full-stack rental platform built with **React Native (Expo)**, **Node.js**, **Express**, and **MongoDB**. RentEase connects home seekers with verified rental listings, enabling discovery, filtering, in-app tour scheduling, and bookmarking.
-
----
-
-## 📱 Features
-
-- **Authentication**: JWT-based user authentication (Register, Login, Me) with bcrypt password hashing and persistent sessions via AsyncStorage.
-- **Property Discovery**: Rich home feed showcasing featured listings, category filtering (Apartments, Houses, Villas, Studios), and keyword search.
-- **Detailed Property Views**: Multi-image preview, full specs (Bedrooms, Bathrooms, Sq Ft, Furnishing status), security deposit breakdown, and amenities list.
-- **Search & Filters**: Real-time filtering by city, property type, price ranges, and keywords.
-- **Bookmarks / Favorites**: Cloud-synced saved listings accessible across devices.
-- **Visit Scheduling**: In-person tour booking with configurable morning, afternoon, and evening slots.
-- **User Profile & Settings**: Account overview, role management (Renter vs. Landlord), notifications toggle, and secure sign-out.
+RentEase is a full-stack mobile rental marketplace application built with React Native (Expo) and a Node.js/Express/MongoDB backend. It allows tenants to discover flat shares, rooms, PGs, and flats while enabling property owners to create listings and manage visit requests.
 
 ---
 
-## 🛠️ Tech Stack
+## Repository Structure
 
-### Frontend
-- **Framework**: React Native 0.86 with Expo SDK 57 (Expo Router)
-- **Styling**: Themed Components, StyleSheet, CSS Modules
-- **State & Storage**: React Context API, Universal Storage Layer
-- **Icons & Assets**: Custom SVG & PNG iconography, Expo Symbols
-
-### Backend
-- **Runtime**: Node.js & Express 5
-- **Database**: MongoDB with Mongoose ODM
-- **Security**: JSON Web Tokens (JWT), bcryptjs password hashing, CORS
-- **Uploads**: Multer image processing pipeline
-
----
-
-## 🚀 Getting Started
-
-### 1. Prerequisites
-- Node.js (v18+ recommended)
-- npm or yarn
-- Expo Go app on mobile (or iOS/Android simulator)
-
-### 2. Backend Setup
-```bash
-cd backend
-npm install
-cp .env.example .env
-npm run dev
+```text
+RentEase/
+├── backend/            # Node.js/Express Backend API Server
+├── frontend/           # React Native Expo Mobile Frontend
+├── .gitignore          # Git ignore rules (ignoring secrets, builds, and spec documents)
+├── README.md           # This project overview and setup guide
+└── progress.md         # Persistent tracking of development status (completed/remaining work)
 ```
-The server will run at `http://localhost:5000`.
-
-### 3. Frontend Setup
-```bash
-cd frontend
-npm install
-npm run start
-```
-Scan the QR code with Expo Go or press `w` to open in browser.
 
 ---
 
-## 📡 API Overview
+## Local Development Setup
 
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `POST` | `/api/auth/register` | Register new user | Public |
-| `POST` | `/api/auth/login` | Sign in & receive JWT | Public |
-| `GET` | `/api/auth/me` | Fetch active user profile | Bearer Token |
-| `GET` | `/api/properties` | List properties with query filters | Public |
-| `GET` | `/api/properties/featured` | Fetch featured listings | Public |
-| `GET` | `/api/properties/:id` | Get single property details | Public |
-| `POST` | `/api/properties` | Create new listing | Landlord/Admin |
-| `GET` | `/api/favorites` | Fetch user bookmarked properties | Bearer Token |
-| `POST` | `/api/favorites/:id` | Toggle property favorite | Bearer Token |
-| `GET` | `/api/visits` | Fetch user scheduled visits | Bearer Token |
-| `POST` | `/api/visits` | Book a property visit | Bearer Token |
+### Prerequisites
+
+- **Node.js**: v20 or later (v26 is supported)
+- **npm**: v10 or later
+- **MongoDB**: A running MongoDB instance (Local or Atlas Cluster)
+- **Expo Go** app (installed on your iOS/Android device for testing) or an Emulator
 
 ---
 
-## 📄 License
-ISC License © 2026 Raunak Shahu
+### Backend Setup
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create a `.env` file from the example:
+   ```bash
+   cp .env.example .env
+   ```
+4. Update the variables in `.env` (e.g., set your `MONGO_URI` and `JWT_SECRET`).
+5. Start the backend development server:
+   ```bash
+   npm run dev
+   ```
+   The backend API will run at `http://localhost:5000`.
+
+---
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the Expo development server:
+   ```bash
+   npx expo start
+   ```
+4. Scan the QR code using the Expo Go app or press `a` (Android) / `i` (iOS) / `w` (Web) to open the application.
+
+---
+
+## Git Workflow and Version Control
+
+Development is structured into phases, and each completed task corresponds to an isolated Git commit.
+
+### Branch Strategy
+- `develop`: Primary development branch.
+- `main`: Production-ready, stable releases.
+- `feature/*`: Specific feature branches.
+- `fix/*`: Specific bug fix branches.
+
+### Commit Guidelines
+- Keep commits small, buildable, and focused on a single logical task.
+- Format: `type(scope): description` (e.g., `feat(auth): add user registration API`).
+- Pushes to the GitHub remote repository should occur immediately after task commits.

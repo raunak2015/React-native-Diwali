@@ -2,34 +2,38 @@ const mongoose = require('mongoose');
 
 const visitRequestSchema = new mongoose.Schema(
   {
-    renter: {
+    tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: [true, 'Tenant is required'],
     },
-    property: {
+    ownerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'Owner is required'],
+    },
+    propertyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Property',
-      required: true,
+      required: [true, 'Property is required'],
     },
-    visitDate: {
-      type: Date,
-      required: [true, 'Please select visit date'],
-    },
-    timeSlot: {
+    requestedDate: {
       type: String,
-      required: [true, 'Please select a preferred time slot'],
-      enum: ['Morning (9am - 12pm)', 'Afternoon (12pm - 4pm)', 'Evening (4pm - 8pm)'],
-      default: 'Evening (4pm - 8pm)',
+      required: [true, 'Requested date is required'],
     },
-    notes: {
+    requestedTimeSlot: {
       type: String,
-      maxlength: [300, 'Notes cannot exceed 300 characters'],
+      enum: ['Morning', 'Afternoon', 'Evening'],
+      required: [true, 'Time slot is required'],
+    },
+    note: {
+      type: String,
       default: '',
+      maxlength: [500, 'Note cannot exceed 500 characters'],
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+      enum: ['pending', 'accepted', 'rejected', 'cancelled'],
       default: 'pending',
     },
   },
@@ -38,4 +42,6 @@ const visitRequestSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model('VisitRequest', visitRequestSchema);
+const VisitRequest = mongoose.model('VisitRequest', visitRequestSchema);
+
+module.exports = VisitRequest;

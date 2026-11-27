@@ -15,16 +15,18 @@ connectDB();
 
 const app = express();
 
-// Mount Routes
-const authRoutes = require('./routes/authRoutes');
-const propertyRoutes = require('./routes/propertyRoutes');
-const favoriteRoutes = require('./routes/favoriteRoutes');
-const visitRoutes = require('./routes/visitRoutes');
-
 // Middlewares
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Import Routes
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const propertyRoutes = require('./routes/propertyRoutes');
+const visitRoutes = require('./routes/visitRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // Baseline status route
 app.get('/api', (req, res) => {
@@ -35,10 +37,13 @@ app.get('/api', (req, res) => {
   });
 });
 
+// Mount Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/properties', propertyRoutes);
-app.use('/api/favorites', favoriteRoutes);
 app.use('/api/visits', visitRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

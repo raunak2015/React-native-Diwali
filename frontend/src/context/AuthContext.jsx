@@ -1,64 +1,76 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../../services/api';
-import { getAuthSession, saveAuthSession, clearAuthSession } from '../../utils/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authService } from '@/services/authService';
 
-const AuthContext = createContext({
-  user: null,
-  token: null,
-  isLoading: true,
-  isAuthenticated: false,
-  login: async () => {},
-  register: async () => {},
-  logout: async () => {},
-});
+const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check persistent login state on app start
   useEffect(() => {
     loadStoredSession();
   }, []);
 
   const loadStoredSession = async () => {
     try {
-      const session = await getAuthSession();
-      if (session?.token && session?.user) {
-        setToken(session.token);
-        setUser(session.user);
+      const storedToken = await AsyncStorage.getItem('authToken');
+      const storedUser = await AsyncStorage.getItem('userData');
+
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
       }
     } catch (error) {
-      console.error('Failed to load session:', error);
+      console.error('Error loading stored session:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const login = async (email, password) => {
-    const res = await api.login({ email, password });
-    if (res?.data?.token && res?.data?.user) {
-      setToken(res.data.token);
-      setUser(res.data.user);
-      await saveAuthSession(res.data.token, res.data.user);
+    setIsLoading(true);
+    try {
+      const res = await authService.login({ email, password });
+      if (res.data) {
+        setUser(res.data);
+        setToken(res.data.token);
+      }
+      return res;
+    } finally {
+      setIsLoading(false);
     }
-    return res;
   };
 
   const register = async (userData) => {
-    const res = await api.register(userData);
-    if (res?.data?.token && res?.data?.user) {
-      setToken(res.data.token);
-      setUser(res.data.user);
-      await saveAuthSession(res.data.token, res.data.user);
+    setIsLoading(true);
+    try {
+      const res = await authService.register(userData);
+      if (res.data) {
+        setUser(res.data);
+        setToken(res.data.token);
+      }
+      return res;
+    } finally {
+      setIsLoading(false);
     }
-    return res;
   };
 
   const logout = async () => {
-    setToken(null);
-    setUser(null);
-    await clearAuthSession();
+    setIsLoading(true);
+    try {
+      await authService.logout();
+      setUser(null);
+      setToken(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateUser = (userData) => {
+    setUser((prev) => ({ ...prev, ...userData }));
   };
 
   return (
@@ -68,14 +80,22 @@ export const AuthProvider = ({ children }) => {
         token,
         isLoading,
         isAuthenticated: !!token,
+        userRole: user?.role || null,
         login,
         register,
         logout,
+        updateUser,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

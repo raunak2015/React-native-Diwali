@@ -2,100 +2,242 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  Image,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
-  Share,
+  ScrollView,
+  Image,
+  Dimensions,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { api } from '../../../services/api';
-import { Badge } from '../../components/badge';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { propertyService } from '@/services/propertyService';
+import { favoriteService } from '@/services/favoriteService';
+import { useAuth } from '@/context/AuthContext';
+import { calculateHaversineDistance, getCurrentUserLocation } from '@/utils/location';
+import {
+  copyToClipboard,
+  shareProperty,
+  callPhone,
+  sendEmail,
+  openWhatsApp,
+} from '@/utils/contacts';
+import Loader from '@/components/ui/Loader';
+import ErrorState from '@/components/ui/ErrorState';
+import Avatar from '@/components/ui/Avatar';
+import Tag from '@/components/ui/Tag';
+import Button from '@/components/ui/Button';
+import MapView from '@/components/ui/MapView';
+import colors from '@/constants/colors';
+import typography from '@/constants/typography';
+import spacing, { borderRadius, shadows } from '@/constants/spacing';
 
-export default function PropertyDetailScreen() {
+const { width } = Dimensions.get('window');
+
+export default function PropertyDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { userRole, isAuthenticated } = useAuth();
 
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [error, setError] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [userLocation, setUserLocation] = useState(null);
+  const [distanceText, setDistanceText] = useState(null);
 
   useEffect(() => {
-    fetchDetail();
+    if (id) {
+      fetchDetails();
+      fetchUserLocation();
+      checkFavoriteStatus();
+    }
   }, [id]);
 
-  const fetchDetail = async () => {
+  const checkFavoriteStatus = async () => {
+    if (!isAuthenticated) return;
     try {
-      const res = await api.getPropertyById(id);
-      setProperty(res.data?.property);
+      const res = await favoriteService.getFavorites();
+      const favList = res.data || [];
+      const isFav = favList.some((p) => p._id === id || p === id);
+      setIsFavorite(isFav);
     } catch (e) {
-      console.warn('Failed to load property details', e);
+      console.log('Error checking favorite status:', e);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to save favorite properties.', [
+        { text: 'Sign In', onPress: () => router.push('/sign-in') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    const previousState = isFavorite;
+    setIsFavorite(!previousState);
+
+    try {
+      if (previousState) {
+        await favoriteService.removeFavorite(id);
+      } else {
+        await favoriteService.addFavorite(id);
+      }
+    } catch (err) {
+      setIsFavorite(previousState);
+      Alert.alert('Error', err.message || 'Failed to update favorites.');
+    }
+  };
+
+  const fetchUserLocation = async () => {
+    const loc = await getCurrentUserLocation();
+    if (loc) {
+      setUserLocation(loc);
+    }
+  };
+
+  useEffect(() => {
+    if (userLocation && property?.latitude && property?.longitude) {
+      const dist = calculateHaversineDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        property.latitude,
+        property.longitude
+      );
+      setDistanceText(dist);
+    }
+  }, [userLocation, property]);
+
+  const fetchDetails = async () => {
+    setError(null);
+    try {
+      const res = await propertyService.getPropertyById(id);
+      setProperty(res.data);
+    } catch (err) {
+      setError(err.message || 'Failed to load property details');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleShare = async () => {
-    if (!property) return;
-    try {
-      await Share.share({
-        message: `Check out ${property.title} in ${property.location?.city} for ₹${property.price}/month on RentEase!`,
-      });
-    } catch (e) {}
+  const handleCopyCode = () => {
+    if (property?.propertyCode) {
+      copyToClipboard(property.propertyCode, `Property Code "${property.propertyCode}"`);
+    }
+  };
+
+  const handleShare = () => {
+    shareProperty(property);
+  };
+
+  const handleRequestVisit = () => {
+    router.push({
+      pathname: '/request-visit',
+      params: { propertyId: id, propertyTitle: property?.title },
+    });
+  };
+
+  const handleContactOwner = () => {
+    const owner = property?.ownerId || {};
+    if (!owner.phone && !owner.email) {
+      Alert.alert('Contact Owner', 'Owner contact details are unavailable.');
+      return;
+    }
+
+    const actions = [];
+    if (owner.phone) {
+      actions.push({ text: `📞 Call ${owner.phone}`, onPress: () => callPhone(owner.phone) });
+      actions.push({ text: `💬 WhatsApp`, onPress: () => openWhatsApp(owner.phone, property?.title) });
+    }
+    if (owner.email) {
+      actions.push({ text: `📧 Email ${owner.email}`, onPress: () => sendEmail(owner.email, property?.title) });
+    }
+    actions.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert(
+      `Contact ${owner.name || 'Owner'}`,
+      'Choose how you would like to reach the owner:',
+      actions
+    );
   };
 
   if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
-    );
+    return <Loader message="Loading property details..." />;
   }
 
-  if (!property) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>Property details not found</Text>
-      </View>
-    );
+  if (error || !property) {
+    return <ErrorState message={error || 'Property not found'} onRetry={fetchDetails} />;
   }
+
+  const images = property.images && property.images.length > 0 ? property.images : [];
+  const owner = property.ownerId || {};
+  const isOwner = userRole === 'owner';
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Image Gallery */}
-        <View style={styles.imageGallery}>
-          <Image
-            source={{
-              uri:
-                property.images?.[activeImageIndex] ||
-                'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-            }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backButtonText}>←</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Gallery / Hero Image */}
+        <View style={styles.imageGalleryContainer}>
+          {images.length > 0 ? (
+            <Image
+              source={{ uri: images[selectedImageIndex] }}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.placeholderHero}>
+              <Ionicons name="home" size={64} color={colors.textMuted} />
+              <Text style={styles.placeholderHeroText}>No Image Available</Text>
+            </View>
+          )}
+
+          {/* Overlay Navigation Buttons */}
+          <TouchableOpacity style={styles.backOverlayButton} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <Text style={styles.shareButtonText}>↗️</Text>
-          </TouchableOpacity>
+
+          <View style={styles.overlayRightBtns}>
+            <TouchableOpacity
+              style={styles.overlayIconBtn}
+              onPress={handleShare}
+            >
+              <Ionicons name="share-social-outline" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.overlayIconBtn}
+              onPress={handleToggleFavorite}
+            >
+              <Ionicons
+                name={isFavorite ? 'heart' : 'heart-outline'}
+                size={20}
+                color={isFavorite ? colors.error : colors.textPrimary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Type Badge */}
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeBadgeText}>{property.type}</Text>
+          </View>
         </View>
 
-        {/* Thumbnail selector */}
-        {property.images && property.images.length > 1 && (
-          <ScrollView horizontal style={styles.thumbnailList}>
-            {property.images.map((img, idx) => (
+        {/* Thumbnail Selector */}
+        {images.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.thumbnailStrip}
+          >
+            {images.map((img, idx) => (
               <TouchableOpacity
                 key={idx}
-                onPress={() => setActiveImageIndex(idx)}
+                onPress={() => setSelectedImageIndex(idx)}
                 style={[
                   styles.thumbnailWrapper,
-                  activeImageIndex === idx && styles.thumbnailActive,
+                  selectedImageIndex === idx && styles.thumbnailWrapperSelected,
                 ]}
               >
                 <Image source={{ uri: img }} style={styles.thumbnailImage} />
@@ -104,312 +246,464 @@ export default function PropertyDetailScreen() {
           </ScrollView>
         )}
 
-        {/* Details Card */}
-        <View style={styles.detailsCard}>
-          <View style={styles.headerRow}>
-            <Badge label={property.propertyType} variant="primary" />
-            <Text style={styles.furnishStatus}>{property.furnishing}</Text>
+        {/* Title & Core Details Card */}
+        <View style={styles.mainDetailsCard}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{property.title}</Text>
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={14} color={colors.warning} />
+              <Text style={styles.ratingText}>{property.rating || 4.5}</Text>
+            </View>
           </View>
 
-          <Text style={styles.title}>{property.title}</Text>
-          <Text style={styles.address}>
-            📍 {property.location?.address}, {property.location?.city},{' '}
-            {property.location?.state}
-          </Text>
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={16} color={colors.textMuted} />
+            <Text style={styles.locationText}>{property.address}</Text>
+          </View>
 
-          <View style={styles.priceContainer}>
+          <View style={styles.priceRow}>
             <Text style={styles.price}>
-              ₹{property.price?.toLocaleString('en-IN')}
-              <Text style={styles.priceSub}> / month</Text>
+              ₹{property.price?.toLocaleString('en-IN') || property.price}
+              <Text style={styles.priceUnit}> / month</Text>
             </Text>
-            {property.deposit ? (
-              <Text style={styles.deposit}>
-                Security Deposit: ₹{property.deposit?.toLocaleString('en-IN')}
-              </Text>
-            ) : null}
+
+            {/* Property Code Pill */}
+            <TouchableOpacity style={styles.codePill} onPress={handleCopyCode} activeOpacity={0.8}>
+              <Ionicons name="copy-outline" size={14} color={colors.primary} />
+              <Text style={styles.codePillText}>{property.propertyCode}</Text>
+            </TouchableOpacity>
           </View>
+        </View>
 
-          {/* Key Attributes */}
-          <View style={styles.attributesGrid}>
-            <View style={styles.attributeBox}>
-              <Text style={styles.attributeIcon}>🛏️</Text>
-              <Text style={styles.attributeValue}>{property.bedrooms} BHK</Text>
-              <Text style={styles.attributeLabel}>Bedrooms</Text>
-            </View>
-            <View style={styles.attributeBox}>
-              <Text style={styles.attributeIcon}>🚿</Text>
-              <Text style={styles.attributeValue}>{property.bathrooms}</Text>
-              <Text style={styles.attributeLabel}>Bathrooms</Text>
-            </View>
-            <View style={styles.attributeBox}>
-              <Text style={styles.attributeIcon}>📐</Text>
-              <Text style={styles.attributeValue}>{property.areaSqFt}</Text>
-              <Text style={styles.attributeLabel}>Sq Ft</Text>
+        {/* Description Section */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Property Description</Text>
+          <Text style={styles.descriptionText}>{property.description}</Text>
+        </View>
+
+        {/* Facilities Section */}
+        {property.facilities && property.facilities.length > 0 && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Facilities & Amenities</Text>
+            <View style={styles.facilityWrap}>
+              {property.facilities.map((facility) => (
+                <Tag key={facility} label={facility} selected={false} />
+              ))}
             </View>
           </View>
+        )}
 
-          {/* Description */}
-          <Text style={styles.sectionHeading}>About this property</Text>
-          <Text style={styles.description}>{property.description}</Text>
-
-          {/* Amenities */}
-          {property.amenities && property.amenities.length > 0 && (
-            <View style={styles.amenitiesSection}>
-              <Text style={styles.sectionHeading}>Amenities</Text>
-              <View style={styles.amenitiesGrid}>
-                {property.amenities.map((amenity, i) => (
-                  <View key={i} style={styles.amenityChip}>
-                    <Text style={styles.amenityText}>✓ {amenity}</Text>
-                  </View>
-                ))}
+        {/* Location & Map Section */}
+        <View style={styles.sectionCard}>
+          <View style={styles.locationHeaderRow}>
+            <Text style={styles.sectionTitle}>Location & Map</Text>
+            {distanceText && (
+              <View style={styles.distanceBadge}>
+                <Ionicons name="navigate" size={12} color={colors.primary} />
+                <Text style={styles.distanceBadgeText}>{distanceText}</Text>
               </View>
+            )}
+          </View>
+          <Text style={styles.mapAddressText}>{property.address}</Text>
+
+          <MapView
+            latitude={property.latitude || 23.0225}
+            longitude={property.longitude || 72.5714}
+            title={property.title}
+            address={property.address}
+            height={200}
+          />
+        </View>
+
+        {/* Owner Details Card */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Listed by Owner</Text>
+          <View style={styles.ownerRow}>
+            <Avatar source={owner.profileImage} name={owner.name} size={54} />
+            <View style={styles.ownerInfo}>
+              <Text style={styles.ownerName}>{owner.name || 'Property Owner'}</Text>
+              <Text style={styles.ownerContact}>{owner.email || owner.phone || 'Verified Owner'}</Text>
+              {owner.bio ? (
+                <Text style={styles.ownerBio} numberOfLines={2}>
+                  "{owner.bio}"
+                </Text>
+              ) : null}
             </View>
-          )}
+          </View>
+
+          {/* Quick Contact Actions */}
+          <View style={styles.contactActionsRow}>
+            {owner.phone && (
+              <TouchableOpacity
+                style={styles.contactActionBtn}
+                onPress={() => callPhone(owner.phone)}
+              >
+                <Ionicons name="call" size={18} color={colors.success} />
+                <Text style={styles.contactActionText}>Call</Text>
+              </TouchableOpacity>
+            )}
+            {owner.phone && (
+              <TouchableOpacity
+                style={styles.contactActionBtn}
+                onPress={() => openWhatsApp(owner.phone, property.title)}
+              >
+                <Ionicons name="logo-whatsapp" size={18} color={colors.success} />
+                <Text style={styles.contactActionText}>WhatsApp</Text>
+              </TouchableOpacity>
+            )}
+            {owner.email && (
+              <TouchableOpacity
+                style={styles.contactActionBtn}
+                onPress={() => sendEmail(owner.email, property.title)}
+              >
+                <Ionicons name="mail" size={18} color={colors.primary} />
+                <Text style={styles.contactActionText}>Email</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.contactActionBtn}
+              onPress={handleShare}
+            >
+              <Ionicons name="share-social" size={18} color={colors.textSecondary} />
+              <Text style={styles.contactActionText}>Share</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
-      {/* Bottom Sticky Action Bar */}
-      <View style={styles.bottomBar}>
-        <View>
-          <Text style={styles.bottomBarLabel}>Monthly Rent</Text>
-          <Text style={styles.bottomBarPrice}>
-            ₹{property.price?.toLocaleString('en-IN')}
-          </Text>
+      {/* Sticky Bottom Actions */}
+      {!isOwner && (
+        <View style={styles.stickyFooter}>
+          <TouchableOpacity
+            style={styles.messageIconBtn}
+            onPress={() =>
+              router.push({
+                pathname: '/chat',
+                params: {
+                  propertyId: id,
+                  propertyTitle: property?.title,
+                  otherUserId: owner._id,
+                  otherUserName: owner.name,
+                  otherUserImage: owner.profileImage,
+                },
+              })
+            }
+          >
+            <Ionicons name="chatbubble-ellipses" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <Button
+            title="Contact Owner"
+            onPress={handleContactOwner}
+            variant="outlined"
+            size="md"
+            style={styles.contactBtn}
+          />
+          <Button
+            title="Request Visit"
+            onPress={handleRequestVisit}
+            variant="primary"
+            size="md"
+            style={styles.visitBtn}
+          />
         </View>
-        <TouchableOpacity
-          style={styles.bookButton}
-          onPress={() =>
-            router.push({
-              pathname: '/visits',
-              params: { propertyId: property._id || property.id },
-            })
-          }
-        >
-          <Text style={styles.bookButtonText}>Book a Visit</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingBottom: 100,
   },
-  imageGallery: {
+  imageGalleryContainer: {
     position: 'relative',
-    height: 300,
-    backgroundColor: '#E2E8F0',
+    width: '100%',
+    height: 280,
   },
   heroImage: {
     width: '100%',
     height: '100%',
   },
-  backButton: {
-    position: 'absolute',
-    top: 44,
-    left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+  placeholderHero: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backButtonText: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0F172A',
+  placeholderHeroText: {
+    ...typography.bodyMd,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
-  shareButton: {
+  backOverlayButton: {
     position: 'absolute',
-    top: 44,
-    right: 20,
+    top: spacing.md,
+    left: spacing.md,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.sm,
   },
-  shareButtonText: {
-    fontSize: 18,
-  },
-  thumbnailList: {
+  overlayRightBtns: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#F8FAFC',
+    gap: spacing.sm,
+  },
+  overlayIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.sm,
+  },
+  typeBadge: {
+    position: 'absolute',
+    bottom: spacing.md,
+    left: spacing.md,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  typeBadgeText: {
+    ...typography.labelSm,
+    color: colors.onPrimary,
+    textTransform: 'uppercase',
+  },
+  thumbnailStrip: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.screenPadding,
+    marginTop: spacing.sm,
   },
   thumbnailWrapper: {
-    borderRadius: 8,
-    marginRight: 10,
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.md,
+    marginRight: spacing.xs,
+    overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  thumbnailActive: {
-    borderColor: '#2563EB',
+  thumbnailWrapperSelected: {
+    borderColor: colors.primary,
   },
   thumbnailImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 6,
+    width: '100%',
+    height: '100%',
   },
-  detailsCard: {
-    padding: 20,
+  mainDetailsCard: {
+    backgroundColor: colors.surfaceContainerLowest,
+    marginHorizontal: spacing.screenPadding,
+    marginTop: spacing.md,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xl,
+    ...shadows.sm,
   },
-  headerRow: {
+  titleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  furnishStatus: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '600',
-    textTransform: 'capitalize',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 6,
+    ...typography.headlineLg,
+    fontSize: 22,
+    color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.sm,
   },
-  address: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 16,
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.warningLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.full,
+    gap: 4,
   },
-  priceContainer: {
-    backgroundColor: '#F8FAFC',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
+  ratingText: {
+    ...typography.labelLg,
+    color: colors.textPrimary,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  locationText: {
+    ...typography.bodyMd,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    paddingTop: spacing.md,
   },
   price: {
+    ...typography.display,
     fontSize: 26,
-    fontWeight: '800',
-    color: '#2563EB',
+    color: colors.primary,
   },
-  priceSub: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748B',
+  priceUnit: {
+    ...typography.bodyMd,
+    color: colors.textMuted,
+    fontWeight: '400',
   },
-  deposit: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  attributesGrid: {
+  codePill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  attributeBox: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
     alignItems: 'center',
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    gap: 4,
   },
-  attributeIcon: {
-    fontSize: 22,
-    marginBottom: 4,
+  codePillText: {
+    ...typography.labelMd,
+    color: colors.primary,
   },
-  attributeValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
+  sectionCard: {
+    backgroundColor: colors.surfaceContainerLowest,
+    marginHorizontal: spacing.screenPadding,
+    marginTop: spacing.base,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.xl,
+    ...shadows.sm,
   },
-  attributeLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  sectionHeading: {
+  sectionTitle: {
+    ...typography.headlineMd,
     fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 8,
-    marginTop: 8,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
-  description: {
-    fontSize: 15,
+  descriptionText: {
+    ...typography.bodyLg,
+    color: colors.textSecondary,
     lineHeight: 24,
-    color: '#475569',
-    marginBottom: 20,
   },
-  amenitiesSection: {
-    marginBottom: 20,
+  locationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
   },
-  amenitiesGrid: {
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  distanceBadgeText: {
+    ...typography.labelSm,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  mapAddressText: {
+    ...typography.bodyMd,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  facilityWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
+    gap: spacing.sm,
   },
-  amenityChip: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
+  ownerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  amenityText: {
-    fontSize: 13,
-    color: '#1E40AF',
+  ownerInfo: {
+    flex: 1,
+  },
+  ownerName: {
+    ...typography.labelLg,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  ownerContact: {
+    ...typography.bodySm,
+    color: colors.textMuted,
+  },
+  ownerBio: {
+    ...typography.bodySm,
+    fontStyle: 'italic',
+    color: colors.textSecondary,
+    marginTop: spacing.xxs,
+  },
+  contactActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  contactActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surfaceContainerHigh,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xl,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  contactActionText: {
+    ...typography.labelSm,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
-  bottomBar: {
+  stickyFooter: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceContainerLowest,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    borderTopColor: colors.borderLight,
+    paddingHorizontal: spacing.screenPadding,
+    paddingVertical: spacing.md,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: spacing.md,
+    ...shadows.lg,
+  },
+  contactBtn: {
+    flex: 1,
+  },
+  visitBtn: {
+    flex: 1,
+  },
+  messageIconBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
-  },
-  bottomBarLabel: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  bottomBarPrice: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  bookButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  bookButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#EF4444',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
 });
