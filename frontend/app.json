@@ -16,6 +16,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.raunak.rentease",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
