@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -75,10 +76,11 @@ export default function SignInScreen() {
         >
           {/* Header Branding */}
           <View style={styles.headerSection}>
-            <View style={styles.logoBadge}>
-              <Ionicons name="home" size={32} color={colors.primary} />
-            </View>
-            <Text style={styles.brandTitle}>RentEase</Text>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.logoImg}
+              resizeMode="contain"
+            />
             <Text style={styles.welcomeText}>Welcome back</Text>
             <Text style={styles.subtitle}>
               Sign in to manage listings, save favorites, and request visits
@@ -179,6 +181,11 @@ const styles = StyleSheet.create({
   headerSection: {
     alignItems: 'center',
     marginBottom: spacing.xxl,
+  },
+  logoImg: {
+    width: 140,
+    height: 140,
+    marginBottom: spacing.xs,
   },
   logoBadge: {
     width: 64,

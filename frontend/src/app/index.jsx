@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,11 +39,12 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.logoBadge}>
-        <Ionicons name="home" size={48} color={colors.primary} />
-      </View>
-      <Text style={styles.title}>RentEase</Text>
-      <Text style={styles.tagline}>Smart & Simple Property Marketplace</Text>
+      <Image
+        source={require('@/assets/images/logo.png')}
+        style={styles.logoImage}
+        resizeMode="contain"
+      />
+      <Text style={styles.tagline}>Your Trusted Property Partner</Text>
       <ActivityIndicator
         size="large"
         color={colors.primary}
@@ -56,18 +57,14 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
   },
-  logoBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 28,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImage: {
+    width: 220,
+    height: 220,
     marginBottom: spacing.base,
   },
   title: {
@@ -81,6 +78,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.xxl,
+    fontWeight: '600',
   },
   loader: {
     marginTop: spacing.xl,
