@@ -129,6 +129,12 @@ const createProperty = async (req, res, next) => {
       existingCode = await Property.findOne({ propertyCode: code });
     }
 
+    // If user posted a property and was a renter, upgrade them to owner
+    if (req.user && req.user.role === 'renter') {
+      req.user.role = 'owner';
+      await req.user.save();
+    }
+
     const property = await Property.create({
       ownerId: req.user._id,
       title,

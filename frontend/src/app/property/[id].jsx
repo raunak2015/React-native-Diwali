@@ -60,8 +60,8 @@ export default function PropertyDetailsScreen() {
     if (!isAuthenticated) return;
     try {
       const res = await favoriteService.getFavorites();
-      const favList = res.data || [];
-      const isFav = favList.some((p) => p._id === id || p === id);
+      const favList = Array.isArray(res?.data) ? res.data : [];
+      const isFav = favList.some((p) => p && (p._id === id || p === id));
       setIsFavorite(isFav);
     } catch (e) {
       console.log('Error checking favorite status:', e);
@@ -93,7 +93,7 @@ export default function PropertyDetailsScreen() {
   };
 
   const fetchUserLocation = async () => {
-    const loc = await getCurrentUserLocation();
+    const loc = await getCurrentUserLocation(false);
     if (loc) {
       setUserLocation(loc);
     }
@@ -381,10 +381,10 @@ export default function PropertyDetailsScreen() {
                 pathname: '/chat',
                 params: {
                   propertyId: id,
-                  propertyTitle: property?.title,
-                  otherUserId: owner._id,
-                  otherUserName: owner.name,
-                  otherUserImage: owner.profileImage,
+                  propertyTitle: property?.title || '',
+                  otherUserId: owner._id || '',
+                  otherUserName: owner.name || 'Owner',
+                  otherUserImage: owner.profileImage || '',
                 },
               })
             }

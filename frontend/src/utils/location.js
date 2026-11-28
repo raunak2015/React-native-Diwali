@@ -4,15 +4,17 @@ import { Alert } from 'react-native';
 /**
  * Request location permission with user feedback
  */
-export const requestLocationPermission = async () => {
+export const requestLocationPermission = async (showAlert = false) => {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
-        'Location Permission Required',
-        'RentEase uses location services to find rental properties near you and calculate distance. Please enable location access in settings.',
-        [{ text: 'OK' }]
-      );
+      if (showAlert) {
+        Alert.alert(
+          'Location Permission Required',
+          'RentEase uses location services to find rental properties near you and calculate distance. Please enable location access in settings.',
+          [{ text: 'OK' }]
+        );
+      }
       return false;
     }
     return true;
@@ -25,8 +27,8 @@ export const requestLocationPermission = async () => {
 /**
  * Get current user's GPS coordinates
  */
-export const getCurrentUserLocation = async () => {
-  const hasPermission = await requestLocationPermission();
+export const getCurrentUserLocation = async (showAlert = false) => {
+  const hasPermission = await requestLocationPermission(showAlert);
   if (!hasPermission) return null;
 
   try {
@@ -38,7 +40,7 @@ export const getCurrentUserLocation = async () => {
       longitude: location.coords.longitude,
     };
   } catch (error) {
-    console.error('Error getting current location:', error);
+    console.log('Error getting current location:', error);
     return null;
   }
 };
@@ -70,16 +72,29 @@ export const reverseGeocodeCoords = async (latitude, longitude) => {
  * Calculate Haversine distance in kilometers between two coordinates
  */
 export const calculateHaversineDistance = (lat1, lon1, lat2, lon2) => {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const nLat1 = parseFloat(lat1);
+  const nLon1 = parseFloat(lon1);
+  const nLat2 = parseFloat(lat2);
+  const nLon2 = parseFloat(lon2);
+  if (
+    isNaN(nLat1) ||
+    isNaN(nLon1) ||
+    isNaN(nLat2) ||
+    isNaN(nLon2) ||
+    (nLat1 === 0 && nLon1 === 0) ||
+    (nLat2 === 0 && nLon2 === 0)
+  ) {
+    return null;
+  }
 
   const R = 6371; // Earth's radius in kilometers
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const dLat = ((nLat2 - nLat1) * Math.PI) / 180;
+  const dLon = ((nLon2 - nLon1) * Math.PI) / 180;
 
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
+    Math.cos((nLat1 * Math.PI) / 180) *
+      Math.cos((nLat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
 

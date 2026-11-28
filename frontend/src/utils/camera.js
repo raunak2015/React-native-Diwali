@@ -43,8 +43,8 @@ export const captureCameraPhoto = async (options = {}) => {
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ['images'],
     allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.7,
+    aspect: [4, 3],
+    quality: 0.35, // Optimized compression to prevent network timeouts and stay within payload limits
     base64: true,
     ...options,
   });
@@ -71,8 +71,8 @@ export const pickGalleryImage = async (options = {}) => {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.7,
+    aspect: [4, 3],
+    quality: 0.35, // Optimized compression to prevent network timeouts and stay within payload limits
     base64: true,
     ...options,
   });

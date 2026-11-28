@@ -55,7 +55,7 @@ export default function AddPropertyScreen() {
 
   const handleUseCurrentLocation = async () => {
     setFetchingLocation(true);
-    const coords = await getCurrentUserLocation();
+    const coords = await getCurrentUserLocation(true);
     if (coords) {
       setLatitude(coords.latitude);
       setLongitude(coords.longitude);
