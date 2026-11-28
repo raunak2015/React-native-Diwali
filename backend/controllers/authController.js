@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // @desc    Register a new user (Tenant or Owner)
 // @route   POST /api/auth/register
@@ -155,7 +156,9 @@ const updateUserProfile = async (req, res, next) => {
     user.name = req.body.name || user.name;
     user.phone = req.body.phone || user.phone;
     user.bio = req.body.bio !== undefined ? req.body.bio : user.bio;
-    user.profileImage = req.body.profileImage || user.profileImage;
+    if (req.body.profileImage) {
+      user.profileImage = await uploadToCloudinary(req.body.profileImage, 'rentease/profiles');
+    }
 
     if (req.body.password) {
       user.password = req.body.password;

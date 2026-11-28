@@ -1,4 +1,5 @@
 const Property = require('../models/Property');
+const { uploadMultipleToCloudinary } = require('../utils/cloudinary');
 
 // Helper to generate unique property code
 const generatePropertyCode = () => {
@@ -135,13 +136,19 @@ const createProperty = async (req, res, next) => {
       await req.user.save();
     }
 
+    // Upload images to Cloudinary (converting any base64 photos to secure HTTPS URLs)
+    let uploadedImages = [];
+    if (images && images.length > 0) {
+      uploadedImages = await uploadMultipleToCloudinary(images, 'rentease/properties');
+    }
+
     const property = await Property.create({
       ownerId: req.user._id,
       title,
       type,
       price: Number(price),
       description,
-      images: images || [],
+      images: uploadedImages,
       facilities: facilities || [],
       address,
       latitude: latitude ? Number(latitude) : 0,
@@ -181,7 +188,12 @@ const updateProperty = async (req, res, next) => {
       });
     }
 
-    property = await Property.findByIdAndUpdate(req.params.id, req.body, {
+    const updates = { ...req.body };
+    if (updates.images && Array.isArray(updates.images) && updates.images.length > 0) {
+      updates.images = await uploadMultipleToCloudinary(updates.images, 'rentease/properties');
+    }
+
+    property = await Property.findByIdAndUpdate(req.params.id, updates, {
       new: true,
       runValidators: true,
     });
